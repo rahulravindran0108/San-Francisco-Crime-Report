@@ -1,0 +1,112 @@
+---
+title: "SF Crime Report Summer 2014"
+output: html_document
+---
+
+## Overview Of The Dataset
+
+Incidents derived from SFPD Crime Incident Reporting system Updated daily, showing data from 1/1/2003 up until two weeks ago from current date. Please note: San Francisco police have implemented a new system for tracking crime. The dataset included here is still coming from the old system, which is in the process of being retired (a multi-year process). Data included here is no longer the official SFPD data. We will migrate to the new system for DataSF in the upcoming months.
+
+In this report we analyze the incidents pertaining only to the incidents pertaining to summer 2014. We answer the following questions in this visualisation:
+
+- What are the major categories of crimes committeed?
+- during which part of the day were the crimes committed the most ? 
+- What crime category was committed the most during borad daylight ? 
+- Which area contributed the most to these crimes ?
+
+## Summary of the dataset
+
+```{r echo=FALSE, warning=FALSE}
+library(ggplot2)
+library(chron)
+library(ggmap)
+
+crimeDatasetSF <- read.csv('sanfrancisco_incidents_summer_2014.csv')
+
+summary(crimeDatasetSF)
+```
+
+Let us look at the summary of the dataset. Here is a data cookbook exlaining what each label stands for:
+
+- Dates - timestamp of the crime incident
+- Category - category of the crime incident (only in train.csv). This is the target variable you are going to predict.
+- Descript - detailed description of the crime incident (only in train.csv)
+- DayOfWeek - the day of the week
+- PdDistrict - name of the Police Department District
+- Resolution - how the crime incident was resolved (only in train.csv)
+- Address - the approximate street address of the crime incident 
+- X - Longitude
+- Y - Latitude
+
+##Intial exploration of incidents by different factors
+
+First lets observe the incident count vs day of the week. This is to see if there is any particular trend pertaining to weekend vs number of crimes or not.
+
+```{r, echo=FALSE}
+qplot(crimeDatasetSF$DayOfWeek, geom="histogram") + xlab("Days of the week") + ylab("Incident Count")
+```
+
+As seen from the above figure, there are no specific trend that can be seen easily. Let us drill down further to observe any other kind of connections between Incidents and other categorical variable.
+
+```{r fig.width=12, echo=FALSE}
+qplot(crimeDatasetSF$Category, geom="histogram") + xlab("Category Of Event") + 
+  ylab("Incident Count") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+Over the course of summer 2014, the highest incident report pertains to larceny 
+and theft. Let us have a look now at the distribution of crimes over the time of the day to find some kind of inference. It is expeected that most crimes occur either during late night.
+
+
+```{r, echo=FALSE}
+crimeDatasetSF$Date <- as.Date(crimeDatasetSF$Date, "%m/%d/%Y")
+breaks <- c(0, 6,  12,  18, 20, 24) / 24 # times are internally fractions of a day
+labels <- c("midnight","morning", "daylight", "evening","night")
+timeList <-times(paste0(crimeDatasetSF$Time, ":00"))
+crimeDatasetSF$timeOfDay <- cut(timeList, breaks, labels, include.lowest = TRUE)
+qplot(crimeDatasetSF$timeOfDay, geom="histogram") +
+  xlab("time of day") +
+  ylab("number of crime")
+```
+
+From the above graph, we find that the maximum crime occurs druing broad daylight. This is surprising and it would be even more interesting to see the crimes that have been commited during this time. One could not obviously expect crimes such as assault being committed in borad daylight. We would generally not expect theft to pop up in the results. Let us have a look to see in detail what are the crimes committed during borad daylight.
+
+```{r, fig.width=12, echo = FALSE}
+qplot(subset(crimeDatasetSF, crimeDatasetSF$timeOfDay == "daylight")$Category,
+      geom="histogram")+
+      theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+      xlab("Categories of Crime Committed during daylight")+
+      ylab("Number of Crimes Committed")
+```
+
+
+Which areas have been affected the most because of Larceny/Theft ? 
+
+```{r, echo=FALSE}
+crimesInDayLight <- subset(crimeDatasetSF, crimeDatasetSF$timeOfDay == "daylight")
+lTheft<-subset(crimesInDayLight, crimesInDayLight$Category == 'LARCENY/THEFT') 
+
+qplot(lTheft$PdDistrict)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  xlab("PD District") +
+  ylab("number of Larceny/Theft Committed")
+```
+
+In order to validate the above graph, let us plot the map of San Francisco. Plotting the map, we see that the major crimes during daylight was committed in the area mentioned in the distribution above.
+
+```{r, fig.width=12, echo=FALSE, warning=FALSE}
+
+
+
+qmap("San Francisco", zoom = 12, color = "bw")+
+geom_point(data=lTheft, aes(x=lTheft$X, y=lTheft$Y), color="#FFFF3309", fill="#FFFF3309", size=1.3)
+
+```
+
+## Conclusion
+
+We see that:
+
+- The majority of crimes have been committed during broad daylight.
+- Theft/Larceny contributed to the maximum of such crimes and it was concentrated in the Southern PD District.
+- Both the major contributor of crime and the crimes committed during broad daylight was caused due to Larceny/ Theft.
